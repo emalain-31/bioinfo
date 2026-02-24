@@ -251,6 +251,13 @@ boxplot(base_count ~ last_updated, data = platelmintos,
 mtext('last_updated', side = 1, line = 7)
 mtext('Base count', side = 2, line = 5)
 ```
+```{r}
+plat <- platelmintos
+plat$last_updated <- as.Date(plat$last_updated,'%Y-%m-%d')
+plat <- plat[order(plat$last_updated),]
+plat$cumLen <- cumsum(plat$base_count)
+plot(plat$last_updated, plat$cumLen, type  = 'l')
+```
 :::
 
 # La API del navegador (*browser*) de ENA
@@ -284,6 +291,7 @@ URL
 ```{r}
 curl_download(URL, destfile = 'Adh.embl')
 ```
+
 
 :::
 
