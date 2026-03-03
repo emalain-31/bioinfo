@@ -299,9 +299,9 @@ kable(flatten(t7742[['results']][['metadata']])) %>%
 ¿Cuántas proteínas de cocodrilos (taxon 8493) conocemos con el dominio
 *zinc finger, C2HC type* (Pfam PF01530)?
 ```{r}
-cocodrilo <- fromJSON(paste0(API, 'entry/pfam/PF01530/taxonomy/uniprot/8493'))
-
-
+cocodrilo <- fromJSON(paste0(API, 'protein/entry/pfam/PF01530/taxonomy/uniprot/8493')) #lo primero que pones es lo que buscas, en este caso proteinas, y luego pones los filtros
+names (cocodrilo)
+cocodrilo[['proteins']]
 ```
 
 :::
