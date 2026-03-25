@@ -1,0 +1,194 @@
+---
+title: "Práctica 8. Blast"
+format: html
+---
+ 
+# Ejercicio 1
+ El programa BLAST ya se encuentra instalado en el ordenador virtual. Los datos de uniprot los he descargado y descomprimido en la carpeta data.
+```{bash}
+if [ ! -e ../../data/buchnera.paa ]; then
+   # Creamos un archivo para enmascarar zonas de baja complejidad:
+   if [ ! -e buchnera_seg.asnb ]; then
+      segmasker -in ../../data/buchnera.fa \
+                -infmt fasta \
+                -parse_seqids \
+                -outfmt maskinfo_asn1_bin \
+                -out ../../data/buchnera_seg.asnb
+   fi
+   # Y indexamos el archivo FASTA para BLAST:
+   makeblastdb  -in ../../data/buchnera.fa \
+                -input_type fasta \
+                -dbtype prot \
+                -parse_seqids \
+                -mask_data ../../data/buchnera_seg.asnb \
+                -out ../../data/buchnera \
+                -title "Proteoma de Buchnera"
+fi
+# Hay que repetir todo esto para Blochmannia.
+```
+```{bash}
+if [ ! -e ../../data/blochmannia.paa ]; then
+   # Creamos un archivo para enmascarar zonas de baja complejidad:
+   if [ ! -e blochmannia_seg.asnb ]; then
+      segmasker -in ../../data/blochmannia.fa \
+                -infmt fasta \
+                -parse_seqids \
+                -outfmt maskinfo_asn1_bin \
+                -out ../../data/blochmannia_seg.asnb
+   fi
+   # Y indexamos el archivo FASTA para BLAST:
+   makeblastdb  -in ../../data/blochmannia.fa \
+                -input_type fasta \
+                -dbtype prot \
+                -parse_seqids \
+                -mask_data ../../data/blochmannia_seg.asnb \
+                -out ../../data/blochmannia \
+                -title "Proteoma de Blochmannia"
+fi
+# Hay que repetir todo esto para Blochmannia.
+```
+ Para buscar las parejas de proteinas más parecidas de Buchnera aphidicola hacia Blochmannia ocreatus:
+```{bash}
+blastp -query ../../data/buchnera.fa \
+       -db ../../data/blochmannia \
+       -out buc2blo.txt \
+       -outfmt '6 qseqid sseqid qlen slen length evalue bitscore' \
+       -evalue 0.001 \
+       -max_target_seqs 1
+```
+Para evaluar las posibles parejas de Blochmannia ocreatus hacia Buchnera aphidicola
+```{bash}
+blastp -query ../../data/blochmannia.fa \
+       -db ../../data/buchnera \
+       -out blo2buc.txt \
+       -outfmt '6 qseqid sseqid qlen slen length evalue bitscore' \
+       -evalue 0.001 \
+       -max_target_seqs 1
+```
+ 
+
+```{r}
+buc2blo <- read.table(
+   'buc2blo.txt',
+   col.names = c('query', 'subject', 'qlen', 'slen',
+                 'length', 'evalue', 'bitscore')
+)
+blo2buc <- read.table(
+   'blo2buc.txt',
+   col.names = c('query', 'subject', 'qlen', 'slen',
+                 'length', 'evalue', 'bitscore')
+)
+```
+ 
+ Echa un vistazo a estas tablas de resultados. ¿Sabrías identificar las parejas de proteínas que son recíprocamente la que más se parece una a la otra?
+
+Las parejas de proteinas que son recíprocamente más parecidas son aquellas con el bitscore más alto. tr|A0ABY4ST23|A0ABY4ST23_9ENTR y sp|P57145|RPOC_BUCAI contienen un bitscore de 2340 y es el mayor que hay, por lo que son las proteinas más parecidas entre las dos especies. He buscado en uniprot para descubrir qué proteína es, y corresponde a la subunidad beta de la RNA polimerasa DNA-directa.
+
+Otra forma de hacerlo es mediante el siguiente comando:
+```{r}
+buc2blo$reverse <- blo2buc[
+   match(buc2blo$subject, blo2buc$query),
+   'subject'
+]
+coincidencias <- buc2blo[
+   buc2blo$query == buc2blo$reverse,
+   c('query', 'subject')
+]
+```
+
+¿Qué datos te gustaría representar gráficamente para ganar confianza en que los resultados son correctos y tienen sentido?
+Representaría los valores del bitscore.
+ 
+# Ejercicio 2
+```{bash}
+# Como Swissprot debería estar ya descargada en `../../data`, podemos sacar
+# de ahí la secuencia de la proteína escogida:
+blastdbcmd -db ../../data/swissprot -entry P39615 -out P39615.fa
+
+# Y ahora la usamos como query en psi-blast:
+psiblast -db ../../data/swissprot \
+         -query P39615.fa \
+         -out P39615.blastout.txt \
+         -evalue 0.1 \
+         -outfmt 7 \
+         -inclusion_ethresh 0.001 \
+         -num_iterations 7 \
+         -matrix BLOSUM62
+```
+Ahora voy a repetir el proceso para la proteína Q9CC91:
+```{bash}
+# Como Swissprot debería estar ya descargada en `../../data`, podemos sacar
+# de ahí la secuencia de la proteína escogida:
+blastdbcmd -db ../../data/swissprot -entry Q9CC91 -out Q9CC91.fa
+
+# Y ahora la usamos como query en psi-blast:
+psiblast -db ../../data/swissprot \
+         -query Q9CC91.fa \
+         -out Q9CC91.blastout.txt \
+         -evalue 0.1 \
+         -outfmt 7 \
+         -inclusion_ethresh 0.001 \
+         -num_iterations 7 \
+         -matrix BLOSUM62
+```
+
+Consulta la ayuda de psiblast y asegúrate de entender para qué sirven los argumentos que hemos usado. Por ejemplo, ¿cuál es la diferencia entre -evalue y -inclusion_ethresh?¿Cómo harías que la búsqueda fuera más sensible todavía?
+
+-evalue establece el umbral de significancia para dar un resultado. Dará solo aquellos hits que tengan un valor E igual o menor a 0.1 (en este caso). En cambio -inclusion_ethresh establece qué hits se escogen para la siguiente ronda de búsqueda. En este caso, de los que se habían escogido en un principio, solo los que tengan un E value igual o menor a 0.001 serán seleccionados para repetir el "ciclo".
+
+Podríamos hacer la búsqueda más sensible utilizando un valor algo mayor para -inclusion_ethresh, como por ejemplo 0.01.
+
+Para que haga directamente lo mismo para todas las proteínas:
+```{bash}
+# Como Swissprot debería estar ya descargada en `../../data`, podemos sacar
+# de ahí la secuencia de la proteína escogida:
+for proteina in Q9CC91 P39615 B1AJI8 P47343 Q5UPT2 Q6UDG6 A1AFY9 O59825 P30314; do blastdbcmd -db ../../data/swissprot -entry $proteina -out $proteina.fa
+
+# Y ahora la usamos como query en psi-blast:
+psiblast -db ../../data/swissprot \
+         -query $proteina.fa \
+         -out $proteina.blastout.txt \
+         -evalue 0.1 \
+         -outfmt 7 \
+         -inclusion_ethresh 0.001 \
+         -num_iterations 7 \
+         -matrix BLOSUM45
+done
+```
+# Ejercicio 3
+Para escoger las 20 queries al azar:
+```{r}
+library('Biostrings')
+unmapped <- readDNAStringSet('../../data/contaminacion.fa.gz')
+n <- length(unmapped)
+muestra <- unmapped[sample(1:n, 20)]
+writeXStringSet(muestra, 'muestra.fa')
+```
+```{bash}
+if [ ! -e resultado.txt ]; then
+   blastn -query muestra.fa \
+          -db nr \
+          -out resultado.txt \
+          -outfmt '6 qaccver saccver length qlen qstart qend evalue bitscore staxid' \
+          -max_target_seqs 1 \
+          -evalue 0.001 \
+          -remote
+fi
+``` 
+
+```{bash}
+# Extraemos los identificadores taxonómicos (columna 9) de "resultado.txt":
+cut -f 9 resultado.txt | sort | uniq | paste -sd ',' > taxids.txt
+
+# Generamos una tabla con información taxonómica de esos identificadores:
+datasets summary taxonomy taxon $(cat taxids.txt) --as-json-lines | \
+dataformat tsv taxonomy --template tax-summary > taxreport.txt
+```
+
+
+
+
+
+
+
+ 
