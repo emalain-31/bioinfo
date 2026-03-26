@@ -1,0 +1,108 @@
+---
+title: "guion 9"
+author: "Emma"
+format: html
+editor: visual
+embed-resources: true
+---
+
+#Ejercicio 1
+```{r} 
+library(phangorn)
+mtdna <- read.phyDat('../../data/mtDNA.fasta', format = 'fasta')
+modelos <- modelTest(mtdna, control = pml.control(trace = 0))
+```
+
+```{r}
+mt_nj    <-    NJ(dist.dna(as.DNAbin(mtdna), model = 'TN93', gamma = 0.93))
+mt_upgma <- upgma(dist.dna(as.DNAbin(mtdna), model = 'TN93', gamma = 0.93))
+plot(midpoint(mt_nj))
+add.scale.bar()
+
+plot(mt_upgma)
+axisPhylo()
+enraizado <- root(mt_nj, 'G.gorilla_D38114')
+```
+¿Por qué usamos midpoint() al representar gráficamente el árbol de NJ?
+Es un comando que se usa para que el árbol salga enraizado.
+
+```{r}
+#| fig-width: 5
+#| fig-height: 10
+mt_nj    <-    NJ(dist.dna(as.DNAbin(mtdna), model = 'TN93', gamma = 0.93))
+mt_upgma <- upgma(dist.dna(as.DNAbin(mtdna), model = 'TN93', gamma = 0.93))
+plot(midpoint(mt_nj))
+add.scale.bar()
+
+plot(mt_upgma)
+axisPhylo()
+enraizado <- root(mt_nj, 'G.gorilla_D38114')
+```
+```{r}
+veros <- pml_bb(mtdna, model = 'GTR+G(4)+I',
+                control = pml.control(trace = 0))
+```
+
+```{r}
+#| fig-width: 5
+#| fig-height: 10
+mt_ml <- root(veros$tree, 'G.gorilla_D38114')
+plot(midpoint(mt_ml))
+nodelabels()
+```
+
+```{r}
+homo <- extract.clade(mt_ml, 62)
+plot(midpoint(homo))
+```
+
+```{r}
+fechas <- c(0, 0, 0, 0, 0, 0, 0, 0, 0,
+              -400000,
+              -39000, -50000, -110000, -110000,
+              -39820, -40096, -38515, -38310, -39000, -40000, -41210,
+              -42430, -42540, -43230, -43780, -44290, -44770, -49000,
+              -50000, -82752, -65000, -122287, -110450,
+              0, 0, 0, 0, 0, 0, 0, 0, 0)
+setNames(fechas, names(mtdna))
+```
+
+
+```{r}
+fit_td <- pml_bb(mtdna, model = 'GTR+G(4)+I', method = 'tipdated',
+                 tree = enraizado,
+                 tip.dates = fechas, rearrangement = 'NNI',
+                 control = pml.control(trace = 0))
+```
+
+El método tipdated obliga a que el arbol sea ultramétrico (o casi) respetando las edades que le hemos dicho. Por ejemplo, las secuencias arcaicas quedan más hacia el interior. 
+
+```{r}
+#| fig-width: 15
+#| fig-height: 10
+plot(fit_td)
+```
+```{r}
+plotTreeTime(fit_td$tree, fechas) #añadimos lo de $tree porque fit_td contiene otras cosas aparte de tree. Lo de fechas lo ponemos porque es el vector.
+```
+
+Lo que obtenemos es que los gorilas son el outgroup, luego los chimpances. Utilizando DNA mitocondrial, coloca a los denisovanos a los HEidelbergensis dentro del mismo grupo, cuando al utilizar DNA nuclear los denisovanos y neandertales quedan más cerca.
+
+El comando estimate.mu permite estimar el reloj molecular, la tasa molecular a la que evolucionan los linajes.
+
+El comando estimate.dates calcula la tasa de mutacion a partir de las secuencias que le faltan a las secuencias arcaicas.
+
+Si usamos el vector node.dates le podemos decir la decha del nodo de divergencia. Le debemos decir todo en las mismas unidades.
+
+Hemos podido calcular la tasa de cambio en los hominidos utilizando estimate.mu(mt_ml, fechas, p.tol=0.05) y el resultado es 2.187793e-08.
+
+```{r}
+estimate.mu(mt_ml, fechas, p.tol=0.05)
+```
+```{r}
+estimate.dates (mt_ml, fechas, mu = estimate.mu(mt_ml, fechas),
+               min.date = .Machine$double.xmax, show.steps = 0,
+               opt.tol = 1e-8, nsteps = 1000,
+               lik.tol = 0, is.binary.phylo(mt_ml))
+```
+
