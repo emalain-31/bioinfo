@@ -1,0 +1,167 @@
+---
+title: "Práctica 10"
+author: "Emma"
+format: html
+editor: visual
+engine: knitr
+---
+
+Objetivo: ensamblar el genoma de un eucariota diploide con lecturas de PacBio de alta fidelidad.
+
+Primero debemos desargarnos el programa Hifiasm en bash y después tenemos que hacer que esté disponible en la PATH de forma permanente.
+
+Vamos a trabajar a partir de un archivo que contiene lecturas HiFi de una planta, que se han tomado con la tecnología PacBio. Estos datos son un archivo FASTA (alta calidad) y se encuentra dentro de la carpeta "data".
+
+#Revisión de los datos
+##Ejercicio 1
+¿Cuántas secuencias contiene el archivo?
+Para determinar cuantas secuencias hay dentro del archivo sin tener que descomprimirlo se usan el comando 'zgrep'
+
+```{bash}
+zgrep -c "^>" ../../data/At4.10.fa.gz #el comando zgrep cuenta dentro de un archivo comprimido (z). -c es la funcion contar "^>" las lineas que empiecen por >(todas  las lecturas comienzan por ese simbolo).
+```
+Hay 13812 secuencias dentro del archivo
+
+¿Qué longitudes mínima, media y máxima tienen las secuencias?
+Se puede calcular con el siguiente comando:
+```{bash}
+zcat ../../data/At4.10.fa.gz | awk ' #awk es una herramienta de procesamiento de texto que lee los archivos linea por linea, los divide en campos y aplica las reglas que tu le digas.
+BEGIN {min=1e12; max=0; sum=0; len=0; n=0}
+{
+  if ($0 ~ /^>/) {
+    if (len > 0) {
+      if (len < min) min = len
+      if (len > max) max = len
+      sum += len
+      n++
+    }
+    len = 0
+  } else {
+    len += length($0)
+  }
+}
+END {
+  # última secuencia
+  if (len > 0) {
+    if (len < min) min = len
+    if (len > max) max = len
+    sum += len
+    n++
+  }
+  print "Secuencias:", n
+  print "Longitud mínima:", min
+  print "Longitud media:", sum/n
+  print "Longitud máxima:", max
+}'
+```
+Longitud mínima: 2942
+Longitud media: 18143,6
+Longitud máxima: 59075
+
+¿Cuál es el número total de bases?
+
+```{bash}
+zcat ../../data/At4.10.fa.gz | awk '
+/^>/ {next}        # saltar cabeceras
+{sum += length($0)}
+END {print "Total de bases:", sum}
+'
+```
+Hay 250599484 en total
+
+Si se estimara que el genoma a ensamblar fuera de sólo 19 millones de bases, ¿cuál sería la cobertura esperada?
+
+La cobertura es el número de veces que se ha leído cada base de la secuencia, aunque la realidad es que la lectura suele ser dispersa. Habrá sitios que habrán sido leídos 30 veces y otros solo 2. 
+Se calcula como el número total de bases secuenciadas entre el tamaño del genoma:
+
+Cobertura = 250599484/19000000 = 13.18945
+
+#Ensamblaje
+Creamos la carpeta "asm1" donde guardaremos los archivos de lasida que produzca el programa hifiasm.
+
+```{bash}
+#| cache: true
+export PATH=$PATH:~/bin/hifiasm
+if [ ! -e asm1/At4.bp.p_ctg.gfa ]; then
+   hifiasm -o asm1/At4 -t 2 -f 0 ../../data/At4.10.fa.gz 2> asm1/hifiasm.log
+fi
+```
+
+##Ejercicio 2
+Consulta la ayuda de hifiasm (hifiasm -h) y contesta las preguntas siguientes:
+
+    ¿Los parámetros corresponden al ensamblaje de un genoma haploide o diploide?
+    En la ayuda pone que hifiasm te va a dar dos tipos de archivos: hap1/paternal y hap2/maternal. Me han salido archivos denominados hap1 y hap2, por lo que deduzco que se trata de un genoma diploide que contiene una copia paterna y otra materna.
+    
+    ¿Qué nivel de eliminación de duplicaciones hemos aplicado? (El paso de eliminar duplicaciones sirve para que las zonas de alta heterocigosidad no sean ensambladas como contigs diferentes).
+    Se ha usado un nivel 3 de eliminación de duplicaciones, que es el que se aplica por defecto.
+    
+    Si tuvieramos lecturas ultra-largas, ¿con qué opción o argumento añadiríamos esa información?
+    Para añadir esa información tendriamos que escribir en el comando --uI [archivoultralargo.fq].
+
+#Evaluación del resultado
+##Ejercicio 3
+1. ¿Dónde están las secuencias que componen el ensamblaje?
+
+Los contigs principales se encuentran en el archivo prefijo.p_ctg.gfa. En nuestro caso es At4.bp.hap1.p_ctg.gfa
+
+2. En los archivos .gfa, ¿qué son las líneas que empiezan por ‘A’?
+
+'A' corresponde a alineamientos.
+
+3. ¿Qué información tiene los archivos .bed?
+
+LOs archivos .bed contiene la informacion sobre los alineamientos de mala calidad.
+
+4. ¿Cuál es la cobertura media estimada de las secuencias homocigotas?
+
+Este es el histograma que aparece en el archivo .log:
+[M::ha_hist_line]     1: **************** 17335
+[M::ha_hist_line]     2: ******* 8027
+[M::ha_hist_line]     3: **** 4646
+[M::ha_hist_line]     4: **** 4189
+[M::ha_hist_line]     5: **** 3953
+[M::ha_hist_line]     6: **** 4174
+[M::ha_hist_line]     7: ***** 5727
+[M::ha_hist_line]     8: ************* 14347
+[M::ha_hist_line]     9: ********************************* 35412
+[M::ha_hist_line]    10: *************************************************************** 69104
+[M::ha_hist_line]    11: ********************************************************************************************* 100844
+[M::ha_hist_line]    12: **************************************************************************************************** 108913
+[M::ha_hist_line]    13: ******************************************************************************** 87082
+[M::ha_hist_line]    14: *********************************************** 51203
+[M::ha_hist_line]    15: ********************* 22728
+[M::ha_hist_line]    16: ******** 8364
+[M::ha_hist_line]    17: *** 2973
+[M::ha_hist_line]    18: * 1249
+[M::ha_hist_line]    19: * 966
+[M::ha_hist_line]    20: * 974
+[M::ha_hist_line]    21: * 1128
+[M::ha_hist_line]    22: * 1169
+[M::ha_hist_line]    23: * 1112
+[M::ha_hist_line]    24: * 1221
+[M::ha_hist_line]    25: * 944
+[M::ha_hist_line]    26: * 946
+[M::ha_hist_line]    27: * 615
+[M::ha_hist_line]    28: * 658
+[M::ha_hist_line]  rest: ******** 8813
+
+Como vemos, el pico está en 12. No hay otro pico en 6, por lo que podemos deducir que la planta es homocigota.
+
+5. ¿Y la de las heterocigotas?
+En principio no hay, ya que no aparece el otro pico en 
+Esto es posible porque las plantas pueden ser homocigotas.
+
+Para extraer as secuencias en formato FASTA:
+```{bash}
+awk '(/^S/){print ">" $2 "\n" $3}' asm1/At4.bp.p_ctg.gfa > asm1/At4.fa
+```
+
+#Calidad del ensamblaje
+
+
+
+
+
+
+
