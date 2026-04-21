@@ -1,0 +1,83 @@
+---
+title: "guion11"
+author: "Emma"
+format: html
+embed-resources: true
+bibliografy: ../../doc/references.bib
+editor: visual
+engine: knitr
+---
+En esta práctica vamos atrabajr sobre los datos de la prática anterior y nos vamos a descargar además todas las secuencias de ls proteínas codificadas en el cromosoma 4 de Arabidobsis.
+
+Las cabeceras de cada proteina descargada son demasiado extensas, así que las vamos a reducir.
+
+# Ejercicio 1
+Sabiendo que una forma de hacerlo es la siguiente, incluye la orden en un bloque de Bash de tu documento de Quarto de tal manera que el archivo de entrada esté en tu carpeta data y el de salida en la misma carpeta de trabajo de la práctica actual, y además, que sólo se ejecute si el archivo de salida proteinas.fasta no existe.
+
+gawk '(/^>/){split($1, A, /\|/); print ">" A[2]}(/^[^>]/){print $0}'
+
+```{bash}
+if [ ! -e proteinas.fasta ]; then   #la exclamación ! significa "no".
+  awk '(/^>/){split($1, A, /\|/); 
+  print ">" A[2]
+  }(/^[^>]/)
+  {print $0}' ../../data/uniprotkb_2026_04_21.fasta > proteinas.fasta
+fi 
+```
+El esquema del comando awk es el siguiente: awk '.....' input > output 
+
+# Ejercicio 2
+Descargamos la carpeta "RepeatModelerResults.zip" y la descomprimimos nuestra carpeta de hoy de resultados.
+
+
+Explora los resultados de RepeatModeler y trata de contestar las preguntas siguientes.
+
+En el archivo run.log recoge toda esta informacion, y es alli donde he buscado.
+
+    ¿Cuántas familias de elementos transponibles se han encontrado? 24 familias (RepeatScout/RECON discovery complete: 24 families found)
+    ¿Cuánto duró la ejecución del programa? 1 hora, 2 minutos y 16 segundos
+    ¿Cuál dirías que es el archivo de salida más importante? At4-families.fa creo que es el más importante, dado que es el que recoge todas las secuencias. El archivo .stk es parecido, pero en un formato un poco más antiguo (alineamiento de estocolmo). Contiene un alineamiento por cada familia.
+
+# Ejercicio 3
+Suavizar la máscara consiste en sustituir los elementos repetitivos por otros elementos que el programa va a ignorar (supongo que para facilitar el proceso).
+He instalado bedtools.
+
+Utiliza el ensamblaje original como archivo FASTA de entrada y el archivo GFF que ha producido RepetaMasker como coordenadas de las regiones a enmascarar. Lee el manual de bedtools maskfasta en este enlace y genera el ensamblaje con máscara suave llamado At4.soft.fa.
+
+```{bash}
+bedtools maskfasta -fi ../2026-04-16/asm1/At4.fa -bed RepeatMaskerResults/RM01/At4.fa.out.gff -fo At4.soft.fa
+```
+
+En los sitios repetitivos sustituye sus bases por "N".
+
+# Ejercicio 4
+Incluye en tu documento de Quarto un bloque de código (pero no ejecutable, con la opción eval: false) como el anterior, donde los caminos TSERBA y a MINIPROTHINT se correspondan con tu propia carpeta bin, aunque no los tengas instalados.
+```{bash}
+#| eval: false
+export TSEBRA_PATH=/home/bin/TSEBRA/bin/
+export MINIPROTHINT_PATH=/home/bin/miniprothint/
+
+galba.pl --species="Arabidopsis thaliana" \
+         --genome=At4.soft.fa \
+         --prot_seq=proteinas.fasta
+```
+
+# Ejercicio 5
+Échales un vistazo a los archivos de salida de GALBA y trata de sacar algo en claro.
+
+GALBA es un programa diseñado para la prediccion de la estructura de genes codificantes de proteinas en genomas eucariotas. Identifica donde empiezan y donde terminan los genes, exones e intrones en un DNA. Utiliza AUGUSTUS (una herramienta que funciona mediante machine learning) en combinacion con proteinas de otras especies estrechamente relacionadas para mejorar la precision. Es un script de pearl.
+
+EL archivo principal es galba.gtf, que contiene la anotación estructural del genoma.
+
+prot_seq_all.fa contiene las secuencias de las proteinas predichas a partir de los genes
+
+
+
+
+
+
+
+
+
+
+
