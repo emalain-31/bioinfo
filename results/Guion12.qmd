@@ -1,0 +1,121 @@
+---
+title: "guión12"
+format: html
+editor: visual
+embed-resources: true
+---
+# Exploración de datos
+
+
+```{r}
+muestras <- read.table('../../data/dme_elev_samples.tsv', header = TRUE)
+genex <- read.table('../../data/salmon.merged.gene_counts.tsv',
+                    header = TRUE)
+```
+
+## Ejercicio 1
+Usa la función paste() para añadir una columna a muestras que contenga la población y la temperatura unidas por _.
+```{r}
+muestras$grupo <- paste(muestras$population, muestras$temp, sep = "_")
+
+head (muestras)
+```
+
+¿Cuál es el número total de lecturas por muestra?
+
+```{r}
+colSums(genex[ , -c(1, 2)])
+```
+
+¿Los recuentos tienen distribuciones parecidas entre muestras?
+
+```{r}
+boxplot(genex[ , -c(1, 2)], las = 2, 
+        main = "Distribución de recuentos por muestra")
+```
+Como se puede ver en la grafica, la distribución es bastante homogénea.
+
+¿Cuántos genes no se expresan en absoluto en ninguna de las muestras?
+
+```{r}
+counts <- genex[, -c(1, 2)]
+genes_cero_total <- sum(rowSums(counts) == 0)
+cat("El número de genes que no se expresan en ninguna muestra es:", genes_cero_total)
+```
+El número de genes que no se expresan en niguna muestra es 4722.
+
+# Crear el objeto de clase DESeqDataSet
+
+```{r}
+suppressMessages(library('DESeq2'))
+all(names(genex)[3:14] == muestras$sample) #esto es una comprobación de que los nombres de las columnas 3-14 de genex tienen los mimso nombres que la columna sample de muestras
+```
+```{r}
+# Pasamos la columna "sample" a nombres de fila (no es una práctica general de R, las filas no tienen porque tener nombres):
+row.names(muestras) <- muestras$sample
+# Eliminamos la columna "sample" (ahora esa info está en los nombres de las filas):
+muestras$sample <- NULL
+# Y convertimos "population" y "temp" en factores (son variables categóricas que solo admiten un nº concreto de factores posibles, que pueden tener los niveles ordenados):
+muestras$population <- factor(muestras$population,
+                              levels = c('maine', 'panama'))
+muestras$temp       <- factor(muestras$temp,
+                              levels = c('low', 'high'))
+muestras  #"muestras" por tanto es una dataframe con dos factores
+```
+```{r}
+row.names(genex) <- genex$gene_name
+genex$gene_name <- NULL
+genex$gene_id   <- NULL
+genex <- round(as.matrix(genex)) #genex se ha transformado en una matriz
+```
+```{r}
+dds1 <- DESeqDataSetFromMatrix(
+   countData = genex,
+   colData = muestras,
+   design = ~ population + temp
+)#diseño estadístico
+dds1
+```
+# Pre-filtrado
+Una fracción importante de genes no se están expresando en ningúna muestra. Aunque el filtrado no es necesario, ayuda a reducir la memoria ocupada por dds1:
+```{r}
+keep <- rowSums(counts(dds1)) > 0#0 Significa que no hay exprsion.
+dds1 <- dds1[keep, ] #keep es un vector de verdaderos y falsos que será tan largo como lo sea counts
+```
+
+# Expresión diferencial
+Observa que la función DESeq() produce un objeto también de clase DESeqDataSet, pero con resultados añadidos:
+```{r}
+dds1 <- DESeq(dds1) #este comando hace varias cosas
+```
+```{r}
+res <- results(dds1)
+res
+```
+Por defecto, la función results() produce la tabla de resultados para el contraste entre el nivel último y el de referencia del último factor en la tabla que describe las muestras. En este caso, el factor es temp, el nivel de referencia es low y el otro nivel es high. Por tanto, los valores de log2FoldChange representan el logaritmo en base 2 de la relación entre niveles de expresión en muestras high respecto de muestras low.
+
+## Ejercicio 3
+Mira la ayuda de results() y genera también la tabla de resultados para el contraste entre las dos regiones de procedencia de las moscas.
+```{r}
+# Generamos los resultados para el contraste de población
+# Comparamos panama respecto a maine
+res_pop <- results(dds1, contrast = c("population", "panama", "maine"))
+
+# Visualizamos un resumen de los resultados
+summary(res_pop)
+
+# Mostramos las primeras filas de la tabla
+head(res_pop)
+```
+Para cada uno tenemos basemean, el log en base 2 del foldchange (+ se expresa más en tº alta, - se expresa más en tº baja), el error estandar, el estadistico, el valor p y el valor p estandar.
+
+Usa summary() sobre los resultados para ver el número de genes diferencialmente expresados entre cada par de condiciones.
+
+```{r}
+summary(res_pop)
+```
+Hay 19508 genes diferencialmente expresados.
+
+¿Cuál es la tasa de falsos positivos (FDR)?
+La tasa de falsos positivos es <0.1 (adjusted p_value).
+
